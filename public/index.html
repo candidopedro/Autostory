@@ -137,10 +137,25 @@
           <span class="step">3</span>
           <div>
             <h2>Preço em destaque</h2>
-            <p>Confira o preço e escolha a condição de pagamento.</p>
+            <p>Mostre o preço, troque por outro texto ou oculte.</p>
           </div>
         </header>
-        <div class="price-grid">
+        <div class="segmented" id="hlMode" role="radiogroup" aria-label="O que destacar">
+          <button type="button" role="radio" data-hl="price" aria-checked="true">
+            <svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            Preço
+          </button>
+          <button type="button" role="radio" data-hl="text" aria-checked="false">
+            <svg viewBox="0 0 24 24"><path d="M4 7V4h16v3M9 20h6M12 4v16"/></svg>
+            Outro texto
+          </button>
+          <button type="button" role="radio" data-hl="hide" aria-checked="false">
+            <svg viewBox="0 0 24 24"><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.1A10 10 0 0 1 12 5c6 0 10 7 10 7a17 17 0 0 1-3.2 3.9M6.6 6.6C3.9 8.4 2 12 2 12s4 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/></svg>
+            Ocultar
+          </button>
+        </div>
+
+        <div class="price-grid" id="priceBox">
           <label class="field">
             <span class="field-label">Preço</span>
             <span class="prefix">R$</span>
@@ -152,6 +167,21 @@
             <input id="oldPriceInput" type="text" inputmode="decimal" placeholder="0,00" autocomplete="off" />
           </label>
         </div>
+        <div id="hlTextBox" hidden>
+          <label class="field">
+            <span class="field-label">Texto no lugar do preço</span>
+            <input id="hlTextInput" type="text" maxlength="40" placeholder="Ex.: PROMOÇÃO" autocomplete="off" />
+          </label>
+          <div class="chips" id="hlChips" role="group" aria-label="Sugestões de texto">
+            <button type="button" class="chip">PROMOÇÃO</button>
+            <button type="button" class="chip">12x sem juros</button>
+            <button type="button" class="chip">Desconto no Pix</button>
+            <button type="button" class="chip">Frete grátis</button>
+            <button type="button" class="chip">Oferta relâmpago</button>
+            <button type="button" class="chip">Últimas unidades</button>
+          </div>
+        </div>
+
         <label class="field" id="condField">
           <span class="field-label">Condição de pagamento</span>
           <input id="condInput" type="text" maxlength="70" placeholder="Ex.: 12x de R$ 25,00 sem juros" autocomplete="off" />
@@ -188,7 +218,20 @@
             <h2>Preview</h2>
             <p id="previewInfo">Seu story aparece aqui.</p>
           </div>
+          <button class="btn tonal small edit-toggle" id="editBtn" aria-pressed="false" disabled>
+            <svg viewBox="0 0 24 24"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg>
+            <span>Editar disposição</span>
+          </button>
         </header>
+        <div class="edit-bar" id="editBar" hidden>
+          <span class="edit-label" id="editLabel">Arraste os elementos no preview</span>
+          <div class="edit-tools">
+            <button class="icon-btn small" id="elSmaller" title="Diminuir" aria-label="Diminuir" disabled><svg viewBox="0 0 24 24"><path d="M5 12h14"/></svg></button>
+            <button class="icon-btn small" id="elBigger" title="Aumentar" aria-label="Aumentar" disabled><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+            <button class="icon-btn small" id="elHide" title="Ocultar / mostrar" aria-label="Ocultar ou mostrar" disabled><svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+            <button class="icon-btn small" id="layoutReset" title="Restaurar disposição" aria-label="Restaurar disposição"><svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 2.6-6.4M3 4v5h5"/></svg></button>
+          </div>
+        </div>
         <div class="previews" id="previews">
           <div class="placeholder">
             <svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M10 18h4"/></svg>

@@ -8,7 +8,6 @@ const PRESETS = [
   { id: 'clean', name: 'Clean', stops: ['#ffffff', '#f4f4f5', '#e4e4e7'], angle: 180, glow: false },
   { id: 'black-friday', name: 'Oferta', stops: ['#111827', '#7f1d1d', '#dc2626'], angle: 200, glow: true },
 ];
-const DEFAULT_PRESET = 'aurora';
 
 function drawPreset(ctx, preset, W, H) {
   const a = (preset.angle * Math.PI) / 180;

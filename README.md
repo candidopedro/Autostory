@@ -4,10 +4,10 @@ Cole o link de um produto do **Mercado Livre, OLX, Shopee ou Amazon** e o Autost
 
 ## Como funciona
 
-1. **Background**: escolha um fundo pronto no menu ou envie uma imagem do seu dispositivo com o botão ao lado. A imagem enviada fica salva no navegador e vira o fundo padrão das próximas postagens. O botão **Excluir** apaga a imagem e volta para o fundo padrão.
+1. **Background**: o fundo padrão é **Cor do produto**: o Autostory detecta a cor de destaque da foto extraída (ignorando o fundo branco e tons de cinza) e cria um degradê com ela. Também dá para escolher um fundo pronto no menu ou enviar uma imagem do dispositivo com o botão ao lado. A imagem enviada fica salva no navegador e passa a ter prioridade nas próximas postagens. O botão **Excluir** apaga a imagem e volta para a cor do produto.
 2. **Link**: cole a URL e as fotos e o preço do produto são lidos do HTML da página. Toque nas fotos para escolher quais usar. Com mais de uma foto selecionada, escolha entre **Colagem** e **Vários stories**. Se a extração falhar, use **Adicionar fotos do dispositivo**.
-3. **Preço em destaque**: confira o preço extraído (dá para editar), informe o preço antigo, se houver, e a **condição de pagamento**. As sugestões rápidas (12x sem juros, 10% off no Pix, Frete grátis…) calculam a parcela e o valor no Pix a partir do preço e ficam lembradas para as próximas postagens. O texto também pode ser escrito livremente.
-4. **Preview**: **Gerar novamente** troca o estilo (cartão, polaroid ou foto inteira) e a organização da colagem. **Postar** pede o login no Instagram, se você ainda não entrou, e envia as imagens para o n8n publicar.
+3. **Preço em destaque**: escolha o que aparece no lugar do preço: **Preço** (o preço extraído, que dá para editar, mais o preço antigo riscado, se houver), **Outro texto** (PROMOÇÃO, 12x sem juros, Desconto no Pix… ou o que quiser) ou **Ocultar**. A **condição de pagamento** é opcional e tem sugestões rápidas (12x sem juros, 10% off no Pix, Frete grátis…), que calculam a parcela e o valor no Pix a partir do preço e ficam lembradas para as próximas postagens.
+4. **Preview**: sempre no formato 9:16, em qualquer tela. Em **Editar disposição**, arraste as fotos, o painel de preço e o texto do topo direto no preview. Os botões aumentam, diminuem, ocultam ou restauram os elementos, e guias mostram as áreas cobertas pela interface do Instagram. A disposição fica salva para as próximas postagens. **Gerar novamente** troca o estilo (cartão, polaroid ou foto inteira) e a organização da colagem. **Postar** pede o login no Instagram, se você ainda não entrou, e envia as imagens para o n8n publicar.
 
 Outros detalhes:
 - O tema claro ou escuro segue o do dispositivo.

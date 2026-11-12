@@ -57,12 +57,19 @@
   }
 
   // ---------- 1. Background ----------
+  // 'auto' = fundo criado com a cor de destaque da foto do produto (padrão)
+  const AUTO_BG = 'auto';
   async function initBackgrounds() {
     const blob = await Store.getBlob('customBg');
     if (blob) state.customImg = await loadImage(URL.createObjectURL(blob)).catch(() => null);
-    const saved = Store.get('bg');
+    let saved = Store.get('bg');
+    // A partir desta versão o padrão é a cor do produto (o background enviado continua tendo prioridade)
+    if (Store.get('bgV') !== 2) {
+      if (saved !== 'custom') saved = null;
+      Store.set('bgV', 2);
+    }
     state.bg = saved === 'custom' && !state.customImg ? null : saved;
-    if (!state.bg) state.bg = state.customImg ? 'custom' : 'preset:' + DEFAULT_PRESET;
+    if (!state.bg) state.bg = state.customImg ? 'custom' : AUTO_BG;
     buildBgSelect();
   }
 
@@ -70,9 +77,10 @@
     const sel = $('#bgSelect');
     sel.innerHTML = '';
     if (state.customImg) sel.add(new Option('⭐ Meu background', 'custom'));
-    for (const p of PRESETS) sel.add(new Option(p.name + (p.id === DEFAULT_PRESET ? ' (padrão)' : ''), 'preset:' + p.id));
+    sel.add(new Option('🎨 Cor do produto (padrão)', AUTO_BG));
+    for (const p of PRESETS) sel.add(new Option(p.name, 'preset:' + p.id));
     sel.value = state.bg;
-    if (sel.value !== state.bg) state.bg = sel.value = 'preset:' + DEFAULT_PRESET;
+    if (sel.value !== state.bg) state.bg = sel.value = AUTO_BG;
     $('#customNote').hidden = !state.customImg;
     updateBgThumb();
   }
@@ -80,9 +88,18 @@
   function updateBgThumb() {
     const t = $('#bgThumb');
     if (state.bg === 'custom' && state.customImg) t.style.backgroundImage = `url(${state.customImg.src})`;
+    else if (state.bg === AUTO_BG)
+      t.style.backgroundImage = state.accent
+        ? `url(${presetThumb(Renderer.accentPreset(state.accent))})`
+        : 'conic-gradient(from 200deg, #f43f5e, #f59e0b, #22c55e, #3b82f6, #a855f7, #f43f5e)';
     else t.style.backgroundImage = `url(${presetThumb(currentPreset())})`;
   }
   const currentPreset = () => PRESETS.find((p) => 'preset:' + p.id === state.bg) || PRESETS[0];
+  function currentBg() {
+    if (state.bg === 'custom' && state.customImg) return { type: 'image', img: state.customImg };
+    if (state.bg === AUTO_BG) return state.accent ? { type: 'accent', color: state.accent } : { type: 'preset', preset: PRESETS[0] };
+    return { type: 'preset', preset: currentPreset() };
+  }
 
   $('#bgSelect').addEventListener('change', (e) => {
     state.bg = e.target.value;
@@ -113,11 +130,11 @@
     await Store.delBlob('customBg');
     if (state.customImg) URL.revokeObjectURL(state.customImg.src);
     state.customImg = null;
-    state.bg = 'preset:' + DEFAULT_PRESET;
+    state.bg = AUTO_BG;
     Store.set('bg', state.bg);
     buildBgSelect();
     rerender();
-    toast('Background excluído. Voltamos ao fundo padrão.');
+    toast('Background excluído. Voltamos ao fundo com a cor do produto.');
   });
 
   // ---------- 2. Link ----------
@@ -233,7 +250,7 @@
     rerender();
   });
 
-  document.querySelectorAll('.segmented button').forEach((b) =>
+  document.querySelectorAll('#modeBox .segmented button').forEach((b) =>
     b.addEventListener('click', () => {
       state.mode = b.dataset.mode;
       Store.set('mode', state.mode);
@@ -242,7 +259,7 @@
     })
   );
   function syncMode() {
-    document.querySelectorAll('.segmented button').forEach((b) => b.setAttribute('aria-checked', b.dataset.mode === state.mode));
+    document.querySelectorAll('#modeBox .segmented button').forEach((b) => b.setAttribute('aria-checked', b.dataset.mode === state.mode));
   }
 
   const showTitle = $('#showTitle');
@@ -335,7 +352,41 @@
     capTimer = setTimeout(() => { Store.set('caption', $('#captionInput').value); rerender(); }, 250);
   });
 
-  // ---------- 3. Preview ----------
+  // O que vai no lugar do preço: o preço, outro texto (PROMOÇÃO, 12x sem juros…) ou nada
+  state.hlMode = Store.get('hlMode', 'price');
+  $('#hlTextInput').value = Store.get('hlText', '');
+  function syncHl() {
+    document.querySelectorAll('#hlMode button').forEach((b) => b.setAttribute('aria-checked', b.dataset.hl === state.hlMode));
+    $('#priceBox').hidden = state.hlMode !== 'price';
+    $('#hlTextBox').hidden = state.hlMode !== 'text';
+    const v = $('#hlTextInput').value.trim();
+    document.querySelectorAll('#hlChips .chip').forEach((c) => c.setAttribute('aria-pressed', c.textContent.trim() === v));
+  }
+  document.querySelectorAll('#hlMode button').forEach((b) =>
+    b.addEventListener('click', () => {
+      state.hlMode = b.dataset.hl;
+      Store.set('hlMode', state.hlMode);
+      syncHl();
+      if (state.hlMode === 'text' && !$('#hlTextInput').value) $('#hlTextInput').focus();
+      rerender();
+    })
+  );
+  $('#hlTextInput').addEventListener('input', () => {
+    Store.set('hlText', $('#hlTextInput').value);
+    syncHl();
+    rerenderSoon();
+  });
+  document.querySelectorAll('#hlChips .chip').forEach((c) =>
+    c.addEventListener('click', () => {
+      $('#hlTextInput').value = c.textContent.trim();
+      Store.set('hlText', $('#hlTextInput').value);
+      syncHl();
+      rerender();
+    })
+  );
+  syncHl();
+
+  // ---------- 4. Preview ----------
   let raf;
   function rerender() {
     cancelAnimationFrame(raf);
@@ -351,12 +402,20 @@
         state.items.length ? 'Selecione ao menos uma foto' : 'Cole um link para gerar o story'
       }</span></div>`;
       $('#previewInfo').textContent = 'Seu story aparece aqui.';
-      $('#postBtn').disabled = $('#regenBtn').disabled = true;
+      box.dataset.count = '0';
+      $('#postBtn').disabled = $('#regenBtn').disabled = $('#editBtn').disabled = true;
+      $('#editBar').hidden = true;
       return;
+    }
+    // Cor de destaque: primeira foto selecionada com cor marcante (base do fundo padrão)
+    const accent = imgs.map((im) => Renderer.accentColor(im)).find((a) => !a.neutral) || Renderer.accentColor(imgs[0]);
+    if (accent !== state.accent) {
+      state.accent = accent;
+      updateBgThumb();
     }
     const mode = imgs.length > 1 ? state.mode : 'multi';
     state.canvases = Renderer.render({
-      bg: state.bg === 'custom' && state.customImg ? { type: 'image', img: state.customImg } : { type: 'preset', preset: currentPreset() },
+      bg: currentBg(),
       images: mode === 'collage' ? imgs.slice(0, MAX_COLLAGE) : imgs,
       mode,
       info: {
@@ -364,38 +423,178 @@
         price: $('#priceInput').value,
         oldPrice: $('#oldPriceInput').value,
         condition: $('#condInput').value.trim(),
+        highlight: { mode: state.hlMode, text: $('#hlTextInput').value.trim() },
       },
       showTitle: showTitle.checked,
       caption: $('#captionInput').value.trim(),
       variant: state.variant,
+      layout: state.layout,
     });
-    box.innerHTML = '';
-    box.className = 'previews' + (state.canvases.length > 1 ? ' many' : '');
-    state.canvases.forEach((c, i) => {
-      const wrap = document.createElement('div');
-      wrap.className = 'story';
-      wrap.append(c);
-      if (state.canvases.length > 1) wrap.insertAdjacentHTML('beforeend', `<span class="tag">${i + 1}/${state.canvases.length}</span>`);
-      const dl = document.createElement('button');
-      dl.className = 'dl';
-      dl.title = 'Baixar imagem';
-      dl.setAttribute('aria-label', 'Baixar imagem');
-      dl.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 4v12m0 0-4-4m4 4 4-4M5 20h14"/></svg>';
-      dl.addEventListener('click', async () => {
-        const blob = await Renderer.toBlob(c);
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `autostory-${Date.now()}-${i + 1}.jpg`;
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-      });
-      wrap.append(dl);
-      box.append(wrap);
-    });
+    // Os canvases exibidos são reaproveitados (permite arrastar sem recriar a página)
     const n = state.canvases.length;
+    if (box.querySelectorAll('.story').length !== n || box.dataset.count !== String(n)) {
+      box.innerHTML = '';
+      box.dataset.count = n;
+      for (let i = 0; i < n; i++) box.append(makeStory(i, n));
+    }
+    box.className = 'previews' + (n > 1 ? ' many' : '') + (state.editing ? ' editing' : '');
+    box.querySelectorAll('.story').forEach((wrap, i) => {
+      wrap.querySelector('canvas').getContext('2d').drawImage(state.canvases[i], 0, 0);
+      drawBoxes(wrap.querySelector('.edit-layer'), state.canvases[i].boxes);
+    });
     $('#previewInfo').textContent = n > 1 ? `${n} stories serão postados.` : mode === 'collage' ? `Colagem com ${imgs.length} fotos.` : '1 story será postado.';
-    $('#postBtn').disabled = $('#regenBtn').disabled = false;
+    $('#postBtn').disabled = $('#regenBtn').disabled = $('#editBtn').disabled = false;
+    updateEditBar();
   }
+
+  function makeStory(i, n) {
+    const wrap = document.createElement('div');
+    wrap.className = 'story';
+    const view = document.createElement('canvas');
+    view.width = Renderer.W;
+    view.height = Renderer.H;
+    wrap.append(view);
+    if (n > 1) wrap.insertAdjacentHTML('beforeend', `<span class="tag">${i + 1}/${n}</span>`);
+    const layer = document.createElement('div');
+    layer.className = 'edit-layer';
+    // guias das áreas cobertas pela interface do Instagram (topo e campo de resposta)
+    layer.innerHTML =
+      `<div class="safe-zone" style="top:0;height:${(210 / Renderer.H) * 100}%"><span>Área coberta pelo Instagram</span></div>` +
+      `<div class="safe-zone" style="bottom:0;height:${(260 / Renderer.H) * 100}%"><span>Área coberta pelo Instagram</span></div>`;
+    wrap.append(layer);
+    const dl = document.createElement('button');
+    dl.className = 'dl';
+    dl.title = 'Baixar imagem';
+    dl.setAttribute('aria-label', 'Baixar imagem');
+    dl.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 4v12m0 0-4-4m4 4 4-4M5 20h14"/></svg>';
+    dl.addEventListener('click', async () => {
+      const blob = await Renderer.toBlob(state.canvases[i]);
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `autostory-${Date.now()}-${i + 1}.jpg`;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    });
+    wrap.append(dl);
+    return wrap;
+  }
+
+  // Caixas clicáveis sobre o preview, uma por elemento (fotos, painel de preço, texto do topo)
+  function drawBoxes(layer, boxes) {
+    const ids = new Set(boxes.map((b) => b.id));
+    layer.querySelectorAll('.el-box').forEach((el) => !ids.has(el.dataset.id) && el.remove());
+    for (const b of boxes) {
+      let el = layer.querySelector(`.el-box[data-id="${b.id}"]`);
+      if (!el) {
+        el = document.createElement('div');
+        el.className = 'el-box';
+        el.dataset.id = b.id;
+        el.innerHTML = '<span class="el-tag"></span>';
+        layer.append(el);
+      }
+      el.style.left = (b.x / Renderer.W) * 100 + '%';
+      el.style.top = (b.y / Renderer.H) * 100 + '%';
+      el.style.width = (b.w / Renderer.W) * 100 + '%';
+      el.style.height = (b.h / Renderer.H) * 100 + '%';
+      el.classList.toggle('selected', state.selected === b.id);
+      el.classList.toggle('is-hidden', b.hidden);
+      el.querySelector('.el-tag').textContent = b.label + (b.hidden ? ' (oculto)' : '');
+    }
+  }
+
+  // ---------- Editar disposição (arrastar no preview) ----------
+  state.layout = Store.get('layout', {});
+  state.editing = false;
+  state.selected = null;
+  let drag = null;
+  const saveLayout = () => Store.set('layout', state.layout);
+  const selBox = () => state.canvases[0]?.boxes.find((b) => b.id === state.selected);
+
+  function updateEditBar() {
+    $('#editBar').hidden = !state.editing;
+    const b = selBox();
+    if (!b) state.selected = null;
+    $('#editLabel').textContent = b ? b.label : 'Toque em um elemento e arraste';
+    $('#elSmaller').disabled = $('#elBigger').disabled = !b;
+    $('#elHide').disabled = !b || b.id === 'photos';
+    $('#elHide').title = b?.hidden ? 'Mostrar' : 'Ocultar';
+    $('#elHide').setAttribute('aria-label', $('#elHide').title);
+  }
+
+  $('#editBtn').addEventListener('click', () => {
+    state.editing = !state.editing;
+    $('#editBtn').setAttribute('aria-pressed', state.editing);
+    if (!state.editing) state.selected = null;
+    rerender();
+  });
+
+  const previews = $('#previews');
+  previews.addEventListener('pointerdown', (e) => {
+    if (!state.editing) return;
+    const layer = e.target.closest('.edit-layer');
+    if (!layer) return;
+    const el = e.target.closest('.el-box');
+    if (!el) {
+      state.selected = null;
+      return rerender();
+    }
+    e.preventDefault();
+    const id = el.dataset.id;
+    state.selected = id;
+    const t = (state.layout[id] ||= {});
+    const b = selBox();
+    drag = {
+      id, el, pointerId: e.pointerId,
+      sx: e.clientX, sy: e.clientY,
+      dx: t.dx || 0, dy: t.dy || 0,
+      k: Renderer.W / layer.clientWidth,
+      baseCx: b ? b.x + b.w / 2 - (t.dx || 0) : Renderer.W / 2,
+    };
+    layer.setPointerCapture(e.pointerId);
+    el.classList.add('dragging');
+    rerender();
+  });
+  previews.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    const t = state.layout[drag.id];
+    t.dx = drag.dx + (e.clientX - drag.sx) * drag.k;
+    t.dy = drag.dy + (e.clientY - drag.sy) * drag.k;
+    // "ímã" no centro horizontal do story
+    if (Math.abs(drag.baseCx + t.dx - Renderer.W / 2) < 18) t.dx = Renderer.W / 2 - drag.baseCx;
+    rerender();
+  });
+  const endDrag = (e) => {
+    if (!drag || e.pointerId !== drag.pointerId) return;
+    drag.el.classList.remove('dragging');
+    drag = null;
+    saveLayout();
+  };
+  previews.addEventListener('pointerup', endDrag);
+  previews.addEventListener('pointercancel', endDrag);
+
+  function scaleSelected(f) {
+    if (!state.selected) return;
+    const t = (state.layout[state.selected] ||= {});
+    t.s = Math.min(1.8, Math.max(0.5, (t.s || 1) * f));
+    saveLayout();
+    rerender();
+  }
+  $('#elSmaller').addEventListener('click', () => scaleSelected(1 / 1.1));
+  $('#elBigger').addEventListener('click', () => scaleSelected(1.1));
+  $('#elHide').addEventListener('click', () => {
+    if (!state.selected || state.selected === 'photos') return;
+    const t = (state.layout[state.selected] ||= {});
+    t.hidden = !t.hidden;
+    saveLayout();
+    rerender();
+  });
+  $('#layoutReset').addEventListener('click', () => {
+    state.layout = {};
+    state.selected = null;
+    Store.del('layout');
+    rerender();
+    toast('Disposição restaurada.');
+  });
 
   $('#regenBtn').addEventListener('click', () => {
     state.variant++;
@@ -503,6 +702,7 @@
       fd.append('title', state.product?.title || '');
       fd.append('price', $('#priceInput').value);
       fd.append('condition', $('#condInput').value.trim());
+      fd.append('highlight', state.hlMode === 'text' ? $('#hlTextInput').value.trim() : state.hlMode === 'hide' ? '' : $('#priceInput').value);
       const res = await fetch('/api/post', { method: 'POST', body: fd });
       const data = await res.json().catch(() => ({}));
       if (res.status === 401) {

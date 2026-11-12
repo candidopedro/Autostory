@@ -203,6 +203,7 @@ app.post(
           title: req.body.title || '',
           price: req.body.price || '',
           condition: req.body.condition || '',
+          highlight: req.body.highlight || '',
         },
         instagram: { userId: ig.userId, username: ig.username, accessToken: ig.accessToken },
       }),
