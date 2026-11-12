@@ -89,7 +89,7 @@ Onde cada loja guarda as fotos no HTML:
 | Loja | Fotos | Preço |
 |---|---|---|
 | Mercado Livre | `img.ui-pdp-image.ui-pdp-gallery__figure__image` (convertidas para alta resolução) | `.ui-pdp-price__second-line` (preço antigo: `.ui-pdp-price__original-value`) |
-| OLX | `.advc-gallery__image-wrap` | `#price-box-container` |
+| OLX | `.advc-gallery__image-wrap` (a maior versão de cada foto; miniaturas `/thumbsLxA/` viram o original `/images/`) | `#price-box-container` |
 | Amazon | `.imgTagWrapper` (+ demais fotos do bloco `colorImages`) | `.priceToPay .a-offscreen` (preço antigo: `.basisPrice`) |
 | Shopee | `.i9ihcI` | JSON da página (`price` / `price_before_discount`) |
 

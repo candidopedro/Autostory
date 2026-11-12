@@ -225,9 +225,52 @@ function amazon($, html, base) {
 }
 
 // ---------- OLX ----------
-// Imagens: .advc-gallery__image-wrap
+// Todas as versões de uma foto dentro de um elemento, com a largura estimada de cada uma
+function imageCandidates($, el, base) {
+  const $el = $(el);
+  const nodes = $el.is('img, source') ? [$el] : $el.find('img, source').toArray().map((n) => $(n));
+  const out = [];
+  const add = (u, w) => {
+    if (!u || u.startsWith('data:')) return;
+    const abs = absolutize(decode(u.trim()), base);
+    if (!abs) return;
+    // a OLX indica o tamanho no caminho: /thumbs500x360/…
+    const t = abs.match(/\/thumbs(\d+)x(\d+)\//i);
+    out.push({ url: abs, w: w || (t ? Number(t[1]) : 0) });
+  };
+  for (const $n of nodes) {
+    for (const attr of ['srcset', 'data-srcset']) {
+      for (const part of ($n.attr(attr) || '').split(',')) {
+        const [u, d = ''] = part.trim().split(/\s+/);
+        const v = parseFloat(d) || 0;
+        // "640w" = largura em pixels; "2x" = densidade (estimada sobre a largura do elemento)
+        add(u, /w$/i.test(d) ? v : /x$/i.test(d) ? v * (Number($n.attr('width')) || 400) : 0);
+      }
+    }
+    const width = Number($n.attr('width')) || 0;
+    for (const attr of ['data-zoom', 'data-original', 'data-src', 'data-lazy', 'src']) add($n.attr(attr), width);
+  }
+  add(bgUrl($el.attr('style')), 0);
+  return out;
+}
+
+// A foto da OLX na maior resolução: miniaturas (/thumbsLxA/) viram o arquivo original
+// (/images/); entre os originais prefere .jpg; sem original, fica a maior versão.
+function olxBest(cands) {
+  if (!cands.length) return null;
+  const norm = cands.map((c) => ({ ...c, url: c.url.replace(/\/thumbs\d+x\d+\//i, '/images/') }));
+  const originals = norm.filter((c) => /img\.olx\.com\.br\/images\//i.test(c.url));
+  const isJpg = (c) => /\.jpe?g(\?|$)/i.test(c.url);
+  if (originals.length) return (originals.find(isJpg) || originals[0]).url;
+  return norm.reduce((a, b) => (b.w > a.w || (b.w === a.w && isJpg(b) && !isJpg(a)) ? b : a)).url;
+}
+
+// Imagens: .advc-gallery__image-wrap (a primeira é a foto principal do anúncio)
 function olx($, html, base) {
-  let images = collect($, '.advc-gallery__image-wrap', base);
+  let images = $('.advc-gallery__image-wrap')
+    .toArray()
+    .map((el) => olxBest(imageCandidates($, el, base)))
+    .filter(Boolean);
   if (!images.length) {
     // fallback: dados do anúncio embutidos no HTML
     const re = /https?:\\?\/\\?\/img\.olx\.com\.br\\?\/images\\?\/(\d+)\\?\/(\d+)\.(?:jpg|jpeg|webp|png)/g;
@@ -278,7 +321,7 @@ function imageKey(u) {
   if (ml) return 'ml:' + ml[1];
   const amz = u.match(/\/images\/I\/([\w+-]+?)(?:\.|$)/);
   if (amz) return 'amz:' + amz[1];
-  const olx = u.match(/img\.olx\.com\.br\/.*\/(\d+)\.\w+$/);
+  const olx = u.match(/img\.olx\.com\.br\/.*\/([\w-]+)\.\w+(?:\?|$)/);
   if (olx) return 'olx:' + olx[1];
   const sh = u.match(/susercontent\.com\/file\/([\w-]+?)(?:_tn)?$/);
   if (sh) return 'sh:' + sh[1];
