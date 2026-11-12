@@ -145,6 +145,22 @@ button { font: inherit; color: inherit; }
 #linkInput { padding-right: 52px; }
 #captionField { margin-top: 22px; }
 
+/* Preço em destaque */
+.price-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 420px) { .price-grid { grid-template-columns: 1fr; gap: 20px; } }
+.field .prefix { position: absolute; left: 16px; top: 0; height: 54px; display: flex; align-items: center; font-weight: 700; color: var(--text-2); pointer-events: none; }
+.price-grid input { padding-left: 48px; font-weight: 700; }
+#condField { margin-top: 20px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.chip {
+  height: 36px; padding: 0 14px; border-radius: 12px; border: 1.5px solid var(--border-soft); background: var(--surface-strong);
+  font-weight: 600; font-size: 13px; color: var(--text); cursor: pointer; transition: background .2s, border-color .2s, color .2s;
+}
+.chip:hover { border-color: var(--primary); }
+.chip[aria-pressed='true'] { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.chip[aria-pressed='true']::before { content: '✓ '; }
+.hint.small { font-size: 12px; margin: 10px 0 0; }
+
 /* Botões */
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 48px; padding: 0 22px;

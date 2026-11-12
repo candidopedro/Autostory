@@ -73,7 +73,8 @@ const Renderer = (() => {
   }
 
   function wrap(ctx, text, maxW, maxLines) {
-    const words = String(text).split(/\s+/).filter(Boolean);
+    // separa só em espaços comuns: "R$ 341,15" (espaço não separável) nunca quebra no meio
+    const words = String(text).split(/[ \t\n]+/).filter(Boolean);
     const lines = [];
     let line = '';
     for (let i = 0; i < words.length; i++) {
@@ -84,7 +85,7 @@ const Renderer = (() => {
       if (lines.length === maxLines) break;
     }
     if (line && lines.length < maxLines) lines.push(line);
-    const used = lines.join(' ').split(/\s+/).length;
+    const used = lines.join(' ').split(/[ \t\n]+/).length;
     if (used < words.length && lines.length) {
       let last = lines[lines.length - 1];
       while (last && ctx.measureText(last + '…').width > maxW) last = last.slice(0, -1);
@@ -94,13 +95,8 @@ const Renderer = (() => {
   }
 
   function formatPrice(price, currency = 'BRL') {
-    let p = String(price || '').replace(/[^\d.,]/g, '');
-    if (!p) return '';
-    if (p.includes(',') && p.includes('.')) p = p.replace(/\./g, '').replace(',', '.');
-    else if (p.includes(',')) p = p.replace(',', '.');
-    else if (/^\d{1,3}(\.\d{3})+$/.test(p)) p = p.replace(/\./g, '');
-    const n = Number(p);
-    if (!isFinite(n) || n <= 0) return '';
+    const n = parsePrice(price);
+    if (!n) return '';
     try { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: currency || 'BRL' }).format(n); }
     catch { return 'R$ ' + n.toFixed(2).replace('.', ','); }
   }
@@ -118,49 +114,110 @@ const Renderer = (() => {
     return y + h;
   }
 
-  function infoHeight(ctx, info) {
-    ctx.font = `700 46px ${FONT}`;
-    const lines = info.title ? wrap(ctx, info.title, W - 240, 2).length : 0;
-    return 70 + (info.store ? 40 : 0) + lines * 58 + (formatPrice(info.price, info.currency) ? 110 : 0) + 30;
+  function parsePrice(price) {
+    let p = String(price || '').replace(/[^\d.,]/g, '');
+    if (!p) return 0;
+    if (p.includes(',') && p.includes('.')) p = p.replace(/\./g, '').replace(',', '.');
+    else if (p.includes(',')) p = p.replace(',', '.');
+    else if (/^\d{1,3}(\.\d{3})+$/.test(p)) p = p.replace(/\./g, '');
+    const n = Number(p);
+    return isFinite(n) && n > 0 ? n : 0;
   }
 
-  function drawInfo(ctx, bgCanvas, info) {
-    const h = infoHeight(ctx, info);
-    const x = 70, w = W - 140, y = H - SAFE_BOTTOM - h;
-    glass(ctx, bgCanvas, x, y, w, h, 48);
-    const dark = bgCanvas.light;
-    let cy = y + 60;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'alphabetic';
-    if (info.store && STORE_NAMES[info.store]) {
-      ctx.font = `800 28px ${FONT}`;
-      ctx.fillStyle = dark ? 'rgba(29,23,48,0.6)' : 'rgba(255,255,255,0.75)';
-      if ('letterSpacing' in ctx) ctx.letterSpacing = '4px';
-      ctx.fillText(STORE_NAMES[info.store].toUpperCase(), x + 50, cy);
-      if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
-      cy += 50;
-    }
-    if (info.title) {
+  // Painel inferior: loja, nome, "de" riscado, preço em destaque e condição de pagamento.
+  // Monta uma lista de blocos (com alturas) usada tanto para medir quanto para desenhar.
+  function infoBlocks(ctx, info, showTitle) {
+    const inner = W - 140 - 100;
+    const blocks = [];
+    if (info.store && STORE_NAMES[info.store]) blocks.push({ type: 'store', h: 50 });
+    if (showTitle && info.title) {
       ctx.font = `700 46px ${FONT}`;
-      ctx.fillStyle = dark ? '#1d1730' : '#ffffff';
-      for (const l of wrap(ctx, info.title, w - 100, 2)) {
-        ctx.fillText(l, x + 50, cy + 10);
-        cy += 58;
-      }
+      const lines = wrap(ctx, info.title, inner, 2);
+      blocks.push({ type: 'title', lines, h: lines.length * 58 });
     }
     const price = formatPrice(info.price, info.currency);
-    if (price) {
-      ctx.font = `800 84px ${FONT}`;
-      const pw = ctx.measureText(price).width;
-      const py = cy + 22;
-      const g = ctx.createLinearGradient(x + 50, 0, x + 50 + pw + 60, 0);
-      g.addColorStop(0, '#f9ce34'); g.addColorStop(0.5, '#ee2a7b'); g.addColorStop(1, '#6228d7');
-      rr(ctx, x + 36, py, pw + 76, 104, 52);
-      ctx.fillStyle = g;
-      ctx.fill();
-      ctx.fillStyle = '#fff';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(price, x + 74, py + 56);
+    const oldN = parsePrice(info.oldPrice), priceN = parsePrice(info.price);
+    if (oldN && (!priceN || oldN > priceN)) {
+      blocks.push({ type: 'old', text: 'De ' + formatPrice(info.oldPrice, info.currency), off: priceN ? Math.round((1 - priceN / oldN) * 100) : 0, h: 70 });
+    }
+    if (price) blocks.push({ type: 'price', text: price, h: 134 });
+    if (info.condition) {
+      ctx.font = `700 44px ${FONT}`;
+      // cada condição (separadas por •) em sua própria linha; no máximo 3 linhas
+      const lines = info.condition
+        .split(/\s*[•|]\s*/)
+        .filter(Boolean)
+        .flatMap((part) => wrap(ctx, part, inner - 64, 2))
+        .slice(0, 3);
+      blocks.push({ type: 'cond', lines, h: lines.length * 54 + 40 + 18 });
+    }
+    return blocks;
+  }
+  const hasInfo = (info, showTitle) => !!((showTitle && info?.title) || info?.price || info?.condition || info?.oldPrice);
+
+  function infoHeight(ctx, info, showTitle) {
+    return 100 + infoBlocks(ctx, info, showTitle).reduce((s, b) => s + b.h, 0);
+  }
+
+  function drawInfo(ctx, bgCanvas, info, showTitle) {
+    const blocks = infoBlocks(ctx, info, showTitle);
+    const h = 100 + blocks.reduce((s, b) => s + b.h, 0);
+    const x = 70, w = W - 140, y = H - SAFE_BOTTOM - h, left = x + 50;
+    glass(ctx, bgCanvas, x, y, w, h, 48);
+    const dark = bgCanvas.light;
+    const fg = dark ? '#1d1730' : '#ffffff';
+    const muted = dark ? 'rgba(29,23,48,0.6)' : 'rgba(255,255,255,0.78)';
+    let cy = y + 50;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    for (const b of blocks) {
+      if (b.type === 'store') {
+        ctx.font = `800 28px ${FONT}`;
+        ctx.fillStyle = muted;
+        if ('letterSpacing' in ctx) ctx.letterSpacing = '4px';
+        ctx.fillText(STORE_NAMES[info.store].toUpperCase(), left, cy + 18);
+        if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+      } else if (b.type === 'title') {
+        ctx.font = `700 46px ${FONT}`;
+        ctx.fillStyle = fg;
+        b.lines.forEach((l, i) => ctx.fillText(l, left, cy + 29 + i * 58));
+      } else if (b.type === 'old') {
+        ctx.font = `600 40px ${FONT}`;
+        ctx.fillStyle = muted;
+        const tw = ctx.measureText(b.text).width;
+        ctx.fillText(b.text, left, cy + 28);
+        ctx.fillRect(left - 4, cy + 28, tw + 8, 4); // risco
+        if (b.off > 0) {
+          const label = `-${b.off}%`;
+          ctx.font = `800 34px ${FONT}`;
+          const lw = ctx.measureText(label).width + 36;
+          rr(ctx, left + tw + 24, cy + 3, lw, 50, 25);
+          ctx.fillStyle = '#16a34a';
+          ctx.fill();
+          ctx.fillStyle = '#fff';
+          ctx.fillText(label, left + tw + 42, cy + 29);
+        }
+      } else if (b.type === 'price') {
+        ctx.font = `800 84px ${FONT}`;
+        const pw = ctx.measureText(b.text).width;
+        const g = ctx.createLinearGradient(left, 0, left + pw + 80, 0);
+        g.addColorStop(0, '#f9ce34'); g.addColorStop(0.5, '#ee2a7b'); g.addColorStop(1, '#6228d7');
+        rr(ctx, left - 14, cy + 8, pw + 76, 104, 52);
+        ctx.fillStyle = g;
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.fillText(b.text, left + 24, cy + 64);
+      } else if (b.type === 'cond') {
+        ctx.font = `700 44px ${FONT}`;
+        const tw = Math.max(...b.lines.map((l) => ctx.measureText(l).width));
+        const ph = b.lines.length * 54 + 40;
+        rr(ctx, left - 14, cy + 6, tw + 64, ph, ph > 100 ? 36 : ph / 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        ctx.fillStyle = '#1d1730';
+        b.lines.forEach((l, i) => ctx.fillText(l, left + 18, cy + 6 + 20 + 27 + i * 54));
+      }
+      cy += b.h;
     }
     return y;
   }
@@ -239,7 +296,7 @@ const Renderer = (() => {
   }
 
   /**
-   * opts: { bg, images: HTMLImageElement[], mode: 'collage'|'multi', info, showInfo, caption, variant }
+   * opts: { bg, images, mode: 'collage'|'multi', info: { store, title, price, oldPrice, condition, currency }, showTitle, caption, variant }
    * Retorna uma lista de canvas 1080x1920.
    */
   function render(opts) {
@@ -259,7 +316,8 @@ const Renderer = (() => {
       let top = SAFE_TOP - 40;
       if (opts.caption) top = drawCaption(ctx, bgCanvas, opts.caption) + 50;
       let bottom = H - SAFE_BOTTOM + 40;
-      if (opts.showInfo && (opts.info?.title || opts.info?.price)) bottom = H - SAFE_BOTTOM - infoHeight(ctx, opts.info) - 50;
+      const withInfo = hasInfo(opts.info, opts.showTitle);
+      if (withInfo) bottom = H - SAFE_BOTTOM - infoHeight(ctx, opts.info, opts.showTitle) - 50;
 
       const area = { x: 80, y: top, w: W - 160, h: bottom - top };
       if (imgs.length === 1) drawPhoto(ctx, imgs[0], singleCell(imgs[0], area, style), style, rand);
@@ -268,12 +326,12 @@ const Renderer = (() => {
         const order = variant ? imgs.map((im, i) => [im, rand() + (i === 0 ? -0.3 : 0)]).sort((a, b) => a[1] - b[1]).map((p) => p[0]) : imgs;
         collageCells(order.length, area, pattern).forEach((cell, i) => drawPhoto(ctx, order[i], cell, style, rand));
       }
-      if (opts.showInfo && (opts.info?.title || opts.info?.price)) drawInfo(ctx, bgCanvas, opts.info);
+      if (withInfo) drawInfo(ctx, bgCanvas, opts.info, opts.showTitle);
       return c;
     });
   }
 
   const toBlob = (canvas) => new Promise((r) => canvas.toBlob(r, 'image/jpeg', 0.92));
 
-  return { render, toBlob, formatPrice, W, H, STORE_NAMES };
+  return { render, toBlob, formatPrice, parsePrice, W, H, STORE_NAMES };
 })();

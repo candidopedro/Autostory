@@ -164,6 +164,7 @@
       $('#storeBadge').textContent = Renderer.STORE_NAMES[data.store] || data.store;
       $('#productTitle').textContent = data.title || 'Produto';
       $('#extracted').hidden = false;
+      setPrices(restore?.price ?? data.price, restore?.oldPrice ?? data.oldPrice, restore?.cond);
 
       const loaded = await Promise.all(
         data.images.map((src) => loadImage(proxied(src)).then((img) => ({ src, img })).catch(() => null))
@@ -185,6 +186,7 @@
         $('#extracted').hidden = false;
         $('#storeBadge').textContent = 'Manual';
         $('#productTitle').textContent = 'Adicione as fotos do produto';
+        setPrices('', '');
         renderThumbs();
       }
     } finally {
@@ -243,9 +245,89 @@
     document.querySelectorAll('.segmented button').forEach((b) => b.setAttribute('aria-checked', b.dataset.mode === state.mode));
   }
 
-  const showInfo = $('#showInfo');
-  showInfo.checked = Store.get('showInfo', true);
-  showInfo.addEventListener('change', () => { Store.set('showInfo', showInfo.checked); rerender(); });
+  const showTitle = $('#showTitle');
+  showTitle.checked = Store.get('showTitle', true);
+  showTitle.addEventListener('change', () => { Store.set('showTitle', showTitle.checked); rerender(); });
+
+  // ---------- 3. Preço e condição de pagamento ----------
+  const CHIP_GROUPS = ['parc', 'pix', 'frete'];
+  let chips = Store.get('condChips', {}); // ex.: { parc: '12', pix: '10' } — lembrado entre postagens
+  let condAuto = true; // texto da condição gerado pelas sugestões (recalcula ao mudar o preço)
+  const money = (n) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
+  const plain = (n) => new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+
+  function buildCondition() {
+    const price = Renderer.parsePrice($('#priceInput').value);
+    const parts = [];
+    for (const g of CHIP_GROUPS) {
+      const v = chips[g];
+      if (!v) continue;
+      const n = Number(v);
+      if (g === 'parc') parts.push(price ? `${n}x de ${money(price / n)} sem juros` : `Em até ${n}x sem juros`);
+      if (g === 'pix') parts.push(price ? `${money(price * (1 - n / 100))} no Pix (${n}% off)` : `${n}% de desconto no Pix`);
+      if (g === 'frete') parts.push('Frete grátis');
+    }
+    return parts.join(' • ');
+  }
+  function syncChips() {
+    document.querySelectorAll('#condChips .chip').forEach((c) =>
+      c.setAttribute('aria-pressed', condAuto && chips[c.dataset.group] === c.dataset.value)
+    );
+  }
+  function applyChips() {
+    condAuto = true;
+    $('#condInput').value = buildCondition();
+    syncChips();
+  }
+  // Preenche os campos com o preço extraído do site (o usuário pode editar)
+  function setPrices(price, oldPrice, cond) {
+    const p = Renderer.parsePrice(price), o = Renderer.parsePrice(oldPrice);
+    $('#priceInput').value = p ? plain(p) : '';
+    $('#oldPriceInput').value = o && o > p ? plain(o) : '';
+    if (cond !== undefined && cond !== null) {
+      $('#condInput').value = cond;
+      condAuto = cond === buildCondition();
+      syncChips();
+    } else if (condAuto) applyChips();
+    $('#stepPrice').hidden = false;
+  }
+  document.querySelectorAll('#condChips .chip').forEach((c) =>
+    c.addEventListener('click', () => {
+      const { group, value } = c.dataset;
+      if (condAuto && chips[group] === value) delete chips[group];
+      else {
+        if (!condAuto) chips = {};
+        chips[group] = value;
+      }
+      Store.set('condChips', chips);
+      applyChips();
+      rerender();
+    })
+  );
+  $('#condInput').addEventListener('input', () => {
+    condAuto = false;
+    chips = {};
+    Store.set('condChips', chips);
+    syncChips();
+    rerenderSoon();
+  });
+  for (const id of ['#priceInput', '#oldPriceInput']) {
+    const el = $(id);
+    el.addEventListener('input', () => {
+      if (id === '#priceInput' && condAuto) $('#condInput').value = buildCondition();
+      rerenderSoon();
+    });
+    el.addEventListener('blur', () => {
+      const n = Renderer.parsePrice(el.value);
+      el.value = n ? plain(n) : '';
+    });
+  }
+  let softTimer;
+  function rerenderSoon() {
+    clearTimeout(softTimer);
+    softTimer = setTimeout(rerender, 200);
+  }
+  syncChips();
   let capTimer;
   $('#captionInput').value = Store.get('caption', '');
   $('#captionInput').addEventListener('input', () => {
@@ -277,8 +359,13 @@
       bg: state.bg === 'custom' && state.customImg ? { type: 'image', img: state.customImg } : { type: 'preset', preset: currentPreset() },
       images: mode === 'collage' ? imgs.slice(0, MAX_COLLAGE) : imgs,
       mode,
-      info: state.product || {},
-      showInfo: showInfo.checked,
+      info: {
+        ...(state.product || {}),
+        price: $('#priceInput').value,
+        oldPrice: $('#oldPriceInput').value,
+        condition: $('#condInput').value.trim(),
+      },
+      showTitle: showTitle.checked,
       caption: $('#captionInput').value.trim(),
       variant: state.variant,
     });
@@ -334,6 +421,9 @@
         url: state.product?.url || $('#linkInput').value,
         selected: state.items.filter((x) => x.on).map((x) => x.src),
         variant: state.variant,
+        price: $('#priceInput').value,
+        oldPrice: $('#oldPriceInput').value,
+        cond: $('#condInput').value,
       }));
     } catch {}
   }
@@ -411,6 +501,8 @@
       for (const [i, c] of state.canvases.entries()) fd.append('images', await Renderer.toBlob(c), `story-${i + 1}.jpg`);
       fd.append('productUrl', state.product?.url || '');
       fd.append('title', state.product?.title || '');
+      fd.append('price', $('#priceInput').value);
+      fd.append('condition', $('#condInput').value.trim());
       const res = await fetch('/api/post', { method: 'POST', body: fd });
       const data = await res.json().catch(() => ({}));
       if (res.status === 401) {

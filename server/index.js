@@ -198,7 +198,12 @@ app.post(
       body: JSON.stringify({
         type: 'instagram_story',
         images: imageUrls,
-        product: { url: req.body.productUrl || '', title: req.body.title || '' },
+        product: {
+          url: req.body.productUrl || '',
+          title: req.body.title || '',
+          price: req.body.price || '',
+          condition: req.body.condition || '',
+        },
         instagram: { userId: ig.userId, username: ig.username, accessToken: ig.accessToken },
       }),
       signal: AbortSignal.timeout(120000),

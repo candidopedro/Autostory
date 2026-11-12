@@ -128,24 +128,62 @@
             </div>
           </div>
 
-          <label class="switch">
-            <input type="checkbox" id="showInfo" checked />
-            <span class="track"><span class="thumb"></span></span>
-            Mostrar título e preço
+        </div>
+      </article>
+
+      <!-- 3. Preço em destaque -->
+      <article class="card glass" id="stepPrice" hidden>
+        <header class="card-head">
+          <span class="step">3</span>
+          <div>
+            <h2>Preço em destaque</h2>
+            <p>Confira o preço e escolha a condição de pagamento.</p>
+          </div>
+        </header>
+        <div class="price-grid">
+          <label class="field">
+            <span class="field-label">Preço</span>
+            <span class="prefix">R$</span>
+            <input id="priceInput" type="text" inputmode="decimal" placeholder="0,00" autocomplete="off" />
           </label>
-          <label class="field" id="captionField">
-            <span class="field-label">Texto em destaque (opcional)</span>
-            <input id="captionInput" type="text" maxlength="40" placeholder="Ex.: Achadinho do dia 🔥" />
+          <label class="field">
+            <span class="field-label">Preço antigo (opcional)</span>
+            <span class="prefix">R$</span>
+            <input id="oldPriceInput" type="text" inputmode="decimal" placeholder="0,00" autocomplete="off" />
           </label>
         </div>
+        <label class="field" id="condField">
+          <span class="field-label">Condição de pagamento</span>
+          <input id="condInput" type="text" maxlength="70" placeholder="Ex.: 12x de R$ 25,00 sem juros" autocomplete="off" />
+        </label>
+        <div class="chips" id="condChips" role="group" aria-label="Sugestões de condição de pagamento">
+          <button type="button" class="chip" data-group="parc" data-value="12">12x sem juros</button>
+          <button type="button" class="chip" data-group="parc" data-value="10">10x sem juros</button>
+          <button type="button" class="chip" data-group="parc" data-value="6">6x sem juros</button>
+          <button type="button" class="chip" data-group="pix" data-value="5">5% off no Pix</button>
+          <button type="button" class="chip" data-group="pix" data-value="10">10% off no Pix</button>
+          <button type="button" class="chip" data-group="pix" data-value="15">15% off no Pix</button>
+          <button type="button" class="chip" data-group="frete" data-value="1">Frete grátis</button>
+        </div>
+        <p class="hint small">As sugestões calculam o valor da parcela e do Pix a partir do preço. Você pode editar o texto livremente.</p>
+
+        <label class="switch">
+          <input type="checkbox" id="showTitle" checked />
+          <span class="track"><span class="thumb"></span></span>
+          Mostrar nome do produto
+        </label>
+        <label class="field" id="captionField">
+          <span class="field-label">Texto em destaque (opcional)</span>
+          <input id="captionInput" type="text" maxlength="40" placeholder="Ex.: Achadinho do dia 🔥" />
+        </label>
       </article>
     </section>
 
-    <!-- 3. Preview -->
+    <!-- 4. Preview -->
     <section class="col-right">
       <article class="card glass preview-card" id="stepPreview">
         <header class="card-head">
-          <span class="step">3</span>
+          <span class="step">4</span>
           <div>
             <h2>Preview</h2>
             <p id="previewInfo">Seu story aparece aqui.</p>

@@ -5,8 +5,9 @@ Cole o link de um produto do **Mercado Livre, OLX, Shopee ou Amazon** e o Autost
 ## Como funciona
 
 1. **Background**: escolha um fundo pronto no menu ou envie uma imagem do seu dispositivo com o botão ao lado. A imagem enviada fica salva no navegador e vira o fundo padrão das próximas postagens. O botão **Excluir** apaga a imagem e volta para o fundo padrão.
-2. **Link**: cole a URL e as fotos do produto são extraídas. Toque nas fotos para escolher quais usar. Com mais de uma foto selecionada, escolha entre **Colagem** e **Vários stories**. Se a extração falhar, use **Adicionar fotos do dispositivo**.
-3. **Preview**: **Gerar novamente** troca o estilo (cartão, polaroid ou foto inteira) e a organização da colagem. **Postar** pede o login no Instagram, se você ainda não entrou, e envia as imagens para o n8n publicar.
+2. **Link**: cole a URL e as fotos e o preço do produto são lidos do HTML da página. Toque nas fotos para escolher quais usar. Com mais de uma foto selecionada, escolha entre **Colagem** e **Vários stories**. Se a extração falhar, use **Adicionar fotos do dispositivo**.
+3. **Preço em destaque**: confira o preço extraído (dá para editar), informe o preço antigo, se houver, e a **condição de pagamento**. As sugestões rápidas (12x sem juros, 10% off no Pix, Frete grátis…) calculam a parcela e o valor no Pix a partir do preço e ficam lembradas para as próximas postagens. O texto também pode ser escrito livremente.
+4. **Preview**: **Gerar novamente** troca o estilo (cartão, polaroid ou foto inteira) e a organização da colagem. **Postar** pede o login no Instagram, se você ainda não entrou, e envia as imagens para o n8n publicar.
 
 Outros detalhes:
 - O tema claro ou escuro segue o do dispositivo.
@@ -83,6 +84,17 @@ Em seguida, para cada imagem, o fluxo chama `POST /{ig-user-id}/media` com `medi
 
 ## Observações sobre a extração
 
+Onde cada loja guarda as fotos no HTML:
+
+| Loja | Fotos | Preço |
+|---|---|---|
+| Mercado Livre | `img.ui-pdp-image.ui-pdp-gallery__figure__image` (convertidas para alta resolução) | `.ui-pdp-price__second-line` (preço antigo: `.ui-pdp-price__original-value`) |
+| OLX | `.advc-gallery__image-wrap` | `#price-box-container` |
+| Amazon | `.imgTagWrapper` (+ demais fotos do bloco `colorImages`) | `.priceToPay .a-offscreen` (preço antigo: `.basisPrice`) |
+| Shopee | `.i9ihcI` | JSON da página (`price` / `price_before_discount`) |
+
+Se o seletor não encontrar nada, o extrator usa os planos B abaixo.
+
 - As lojas mudam o HTML com frequência e às vezes bloqueiam acessos automáticos. Por isso cada extrator tem plano B: Open Graph, JSON-LD e uma segunda tentativa como robô de preview de links.
-- A **Shopee** monta a página quase toda por JavaScript, então às vezes só a imagem principal vem. Para essas situações existe **Adicionar fotos do dispositivo**.
+- A **Shopee** monta a página quase toda por JavaScript e troca os nomes de classe (como `i9ihcI`) a cada atualização do site. O HTML que o servidor recebe muitas vezes não traz a galeria, então às vezes só a imagem principal vem. Para essas situações existe **Adicionar fotos do dispositivo**.
 - Links curtos (`amzn.to`, `meli.la`, `s.shopee.com.br`) são seguidos automaticamente.
