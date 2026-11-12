@@ -265,19 +265,12 @@ function olxBest(cands) {
   return norm.reduce((a, b) => (b.w > a.w || (b.w === a.w && isJpg(b) && !isJpg(a)) ? b : a)).url;
 }
 
-// Imagens: .advc-gallery__image-wrap (a primeira é a foto principal do anúncio)
+// Imagens: somente <picture class="advc-gallery__image-wrap"> (a primeira é a foto principal do anúncio)
 function olx($, html, base) {
-  let images = $('.advc-gallery__image-wrap')
+  const images = $('picture.advc-gallery__image-wrap')
     .toArray()
     .map((el) => olxBest(imageCandidates($, el, base)))
     .filter(Boolean);
-  if (!images.length) {
-    // fallback: dados do anúncio embutidos no HTML
-    const re = /https?:\\?\/\\?\/img\.olx\.com\.br\\?\/images\\?\/(\d+)\\?\/(\d+)\.(?:jpg|jpeg|webp|png)/g;
-    const src = decode($('#__NEXT_DATA__').contents().text() || $('#initial-data').attr('data-json') || html);
-    let m;
-    while ((m = re.exec(src))) images.push(`https://img.olx.com.br/images/${m[1]}/${m[2]}.jpg`);
-  }
   const title = text($, '[data-testid="ad-title"] h1', '#description-title h1', 'h1');
   let price = money(text($, '#price-box-container .olx-text--title-large', '#price-box-container h2', '[data-testid="ad-price-wrapper"] h2', '[data-testid="ad-price"]'));
   if (!price) {
@@ -356,7 +349,9 @@ async function extractProduct(rawUrl) {
     base = generic($, retry.finalUrl);
   }
 
-  const images = uniq([...specific.images, ...base.images].filter((u) => u && /^https?:/.test(u)), imageKey).slice(0, MAX_IMAGES);
+  // Na OLX valem apenas as fotos da galeria (<picture class="advc-gallery__image-wrap">)
+  const extra = store === 'olx' ? [] : base.images;
+  const images = uniq([...specific.images, ...extra].filter((u) => u && /^https?:/.test(u)), imageKey).slice(0, MAX_IMAGES);
   if (!images.length)
     throw Object.assign(new Error('Não foi possível encontrar imagens nesse link. Você pode adicionar as fotos manualmente.'), {
       status: 422,

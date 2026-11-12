@@ -89,11 +89,11 @@ Onde cada loja guarda as fotos no HTML:
 | Loja | Fotos | Preço |
 |---|---|---|
 | Mercado Livre | `img.ui-pdp-image.ui-pdp-gallery__figure__image` (convertidas para alta resolução) | `.ui-pdp-price__second-line` (preço antigo: `.ui-pdp-price__original-value`) |
-| OLX | `.advc-gallery__image-wrap` (a maior versão de cada foto; miniaturas `/thumbsLxA/` viram o original `/images/`) | `#price-box-container` |
+| OLX | somente `<picture class="advc-gallery__image-wrap">` (a maior versão de cada foto; miniaturas `/thumbsLxA/` viram o original `/images/`) | `#price-box-container` |
 | Amazon | `.imgTagWrapper` (+ demais fotos do bloco `colorImages`) | `.priceToPay .a-offscreen` (preço antigo: `.basisPrice`) |
 | Shopee | `.i9ihcI` | JSON da página (`price` / `price_before_discount`) |
 
-Se o seletor não encontrar nada, o extrator usa os planos B abaixo.
+Se o seletor não encontrar nada, o extrator usa os planos B abaixo (exceto na OLX, que usa só as fotos da galeria).
 
 - As lojas mudam o HTML com frequência e às vezes bloqueiam acessos automáticos. Por isso cada extrator tem plano B: Open Graph, JSON-LD e uma segunda tentativa como robô de preview de links.
 - A **Shopee** monta a página quase toda por JavaScript e troca os nomes de classe (como `i9ihcI`) a cada atualização do site. O HTML que o servidor recebe muitas vezes não traz a galeria, então às vezes só a imagem principal vem. Para essas situações existe **Adicionar fotos do dispositivo**.
